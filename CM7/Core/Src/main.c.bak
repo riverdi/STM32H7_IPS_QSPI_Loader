@@ -98,8 +98,19 @@ int main(void)
 /* USER CODE BEGIN Boot_Mode_Sequence_2 */
 /* When system initialization is finished, Cortex-M7 will release Cortex-M4 by means of
 HSEM notification */
-
-
+/*HW semaphore Clock enable*/
+__HAL_RCC_HSEM_CLK_ENABLE();
+/*Take HSEM */
+HAL_HSEM_FastTake(HSEM_ID_0);
+/*Release HSEM in order to notify the CPU2(CM4)*/
+HAL_HSEM_Release(HSEM_ID_0,0);
+/* wait until CPU2 wakes up from stop mode */
+timeout = 0xFFFF;
+while((__HAL_RCC_GET_FLAG(RCC_FLAG_D2CKRDY) == RESET) && (timeout-- > 0));
+if ( timeout < 0 )
+{
+Error_Handler();
+}
 /* USER CODE END Boot_Mode_Sequence_2 */
 
   /* USER CODE BEGIN SysInit */
@@ -133,10 +144,12 @@ void SystemClock_Config(void)
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
-  HAL_PWREx_ConfigSupply(PWR_LDO_SUPPLY);
+  /** Supply configuration update enable
+  */
+  HAL_PWREx_ConfigSupply(PWR_DIRECT_SMPS_SUPPLY);
   /** Configure the main internal regulator output voltage
   */
-  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE0);
+  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE3);
 
   while(!__HAL_PWR_GET_FLAG(PWR_FLAG_VOSRDY)) {}
   /** Initializes the RCC Oscillators according to the specified parameters
@@ -167,15 +180,6 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-
-  __HAL_RCC_CSI_ENABLE() ;
-
-  /* Enable SYSCFG clock mondatory for I/O Compensation Cell */
-  __HAL_RCC_SYSCFG_CLK_ENABLE() ;
-
-  /* Enables the I/O Compensation Cell */
-  HAL_EnableCompensationCell();
-
 }
 
 /* USER CODE BEGIN 4 */
