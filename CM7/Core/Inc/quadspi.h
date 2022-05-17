@@ -52,10 +52,9 @@ CSP_QSPI_Erase_Chip( void );
 
 /* USER CODE BEGIN Prototypes */
 
-#define MEMORY_FLASH_SIZE               0x4000000 /* 512 MBits => 64MBytes */
-#define MEMORY_BLOCK_SIZE               0x10000   /* 1024 sectors of 64KBytes */
-#define MEMORY_SECTOR_SIZE              0x1000    /* 16384 subsectors of 4kBytes */
-#define MEMORY_PAGE_SIZE                0x100     /* 262144 pages of 256 bytes */
+#define MEMORY_FLASH_SIZE               0x4000000 /* 512 MBits*/
+#define MEMORY_SECTOR_SIZE              0x1000   /* 64kBytes */
+#define MEMORY_PAGE_SIZE                0x100     /* 256 bytes */
 /* USER CODE END Prototypes */
 
 #ifdef __cplusplus

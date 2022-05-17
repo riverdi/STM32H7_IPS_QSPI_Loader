@@ -22,12 +22,12 @@
 
 
 #ifdef MICRON_QSPI
-#define CHIP_ERASE_CMD 0xC4
+#define CHIP_ERASE_CMD 0xC7
 #define READ_STATUS_REG_CMD 0x05
 #define WRITE_ENABLE_CMD 0x06
 #define READ_CONFIGURATION_REG_CMD ( 0x15UL )
 #define WRITE_STATUS_REG_CMD ( 0x01UL )
-#define SECTOR_ERASE_CMD 0x20
+#define SECTOR_ERASE_CMD 0xD8
 #define SECTOR_ERASE_CMD_QUAD 0x21
 #define QUAD_IN_FAST_PROG_CMD ( 0x32UL )
 #define FOUR_BYTE_QUAD_IN_FAST_PROG_CMD ( 0x34UL )
@@ -103,9 +103,9 @@ void MX_QUADSPI_Init(void)
 	 hqspi.Instance = QUADSPI;
 	  hqspi.Init.ClockPrescaler = 1;
 	  hqspi.Init.FifoThreshold = 1;
-	  hqspi.Init.SampleShifting = QSPI_SAMPLE_SHIFTING_NONE;
+	  hqspi.Init.SampleShifting = QSPI_SAMPLE_SHIFTING_HALFCYCLE;
 	  hqspi.Init.FlashSize = 28;
-	  hqspi.Init.ChipSelectHighTime = QSPI_CS_HIGH_TIME_2_CYCLE;
+	  hqspi.Init.ChipSelectHighTime = QSPI_CS_HIGH_TIME_3_CYCLE;
 	  hqspi.Init.ClockMode = QSPI_CLOCK_MODE_0;
 	  hqspi.Init.FlashID = QSPI_FLASH_ID_1;
 	  hqspi.Init.DualFlash = QSPI_DUALFLASH_DISABLE;
@@ -691,14 +691,17 @@ CSP_QSPI_EnableMemoryMappedMode( void )
     QSPI_MemoryMappedTypeDef sMemMappedCfg;
 
 
-    QSPI_EnterQuad();
+    if ( HAL_OK != QSPI_EnterQuad() )
+     {
+         return HAL_ERROR;   //  WREN failed
+     }
 
-   // if ( HAL_OK != QSPI_WriteEnable( ) )
-    {
-   //     return HAL_ERROR;
-    }
 
-    QSPI_Enter4Bytes();
+    if ( HAL_OK != QSPI_Enter4Bytes())
+     {
+         return HAL_ERROR;   //  WREN failed
+     }
+
 
 
 #ifdef MICRON_QSPI
@@ -1070,29 +1073,28 @@ CSP_QSPI_Erase_Chip( void )
     QSPI_CommandTypeDef sCommand;
 
 
-    QSPI_EnterQuad();
 
 #ifdef MICRON_QSPI
-    if ( HAL_OK != QSPI_WriteEnable_Quad( ) )
+    if ( HAL_OK != QSPI_WriteEnable( ) )
        {
            return HAL_ERROR;
        }
 
 
-       if ( HAL_OK != QSPI_AutoPollingMemReady_Quad( ) )
+       if ( HAL_OK != QSPI_AutoPollingMemReady( ) )
        {
            return HAL_ERROR;
        }
 
 
-       sCommand.InstructionMode = QSPI_INSTRUCTION_4_LINES;
+       sCommand.InstructionMode = QSPI_INSTRUCTION_1_LINE;
          sCommand.AddressSize = QSPI_ADDRESS_24_BITS;
          sCommand.AlternateByteMode = QSPI_ALTERNATE_BYTES_NONE;
          sCommand.DdrMode = QSPI_DDR_MODE_DISABLE;
          sCommand.DdrHoldHalfCycle = QSPI_DDR_HHC_ANALOG_DELAY;
          sCommand.SIOOMode = QSPI_SIOO_INST_EVERY_CMD;
          sCommand.Instruction = CHIP_ERASE_CMD;
-         sCommand.AddressMode = QSPI_ADDRESS_4_LINES;
+         sCommand.AddressMode = QSPI_ADDRESS_NONE;
          sCommand.DataMode = QSPI_DATA_NONE;
          sCommand.DummyCycles = 0;
 
@@ -1104,7 +1106,7 @@ CSP_QSPI_Erase_Chip( void )
        }
 
 
-       while ( _Flash_Busy_Quad( ) )
+       while ( _Flash_Busy( ) )
        {
            HAL_Delay( 10 );
        }

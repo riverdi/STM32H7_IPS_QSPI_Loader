@@ -14,8 +14,8 @@ extern void SystemClock_Config(void);
 int
 Init(void) {
     *(uint32_t*)0xE000EDF0 = 0xA05F0000; //enable interrupts in debug
+uint32_t r[10];
 
-    SystemInit();
 
     /* ADAPTATION TO THE DEVICE
      *
@@ -29,6 +29,7 @@ Init(void) {
 
     SCB->VTOR = 0x24000000 | 0x200;
 
+    SystemInit();
     HAL_Init();
 
     SystemClock_Config();
@@ -39,14 +40,22 @@ Init(void) {
     __HAL_RCC_QSPI_RELEASE_RESET();
 
     if (CSP_QUADSPI_Init() != HAL_OK) {
-        HAL_SuspendTick();
+        //HAL_SuspendTick();
         return LOADER_FAIL;
     }
+
+
+
     if (CSP_QSPI_EnableMemoryMappedMode() != HAL_OK) {
-        HAL_SuspendTick();
+       // HAL_SuspendTick();
         return LOADER_FAIL;
     }
-    HAL_SuspendTick();
+
+
+
+
+   // HAL_SuspendTick();
+
     return LOADER_OK;
 }
 
@@ -61,25 +70,25 @@ Init(void) {
 int
 Write(uint32_t Address, uint32_t Size, uint8_t* buffer) {
 
-    HAL_ResumeTick();
+   // HAL_ResumeTick();
+
+    __HAL_RCC_QSPI_FORCE_RESET();  //completely reset peripheral
+    __HAL_RCC_QSPI_RELEASE_RESET();
 
     if (CSP_QUADSPI_Init() != HAL_OK) {
-            HAL_SuspendTick();
+       //     HAL_SuspendTick();
             return LOADER_FAIL;
         }
 
-    if (HAL_QSPI_Abort(&hqspi) != HAL_OK) {
-        HAL_SuspendTick();
+
+
+    if (CSP_QSPI_WriteMemory( buffer, (Address & (0x0fffffff)), Size) != HAL_OK) {
+      //  HAL_SuspendTick();
         return LOADER_FAIL;
     }
 
+   // HAL_SuspendTick();
 
-    if (CSP_QSPI_WriteMemory((uint8_t*) buffer, (Address & (0x0fffffff)), Size) != HAL_OK) {
-        HAL_SuspendTick();
-        return LOADER_FAIL;
-    }
-
-    HAL_SuspendTick();
     return LOADER_OK;
 }
 
@@ -93,25 +102,25 @@ Write(uint32_t Address, uint32_t Size, uint8_t* buffer) {
 int
 SectorErase(uint32_t EraseStartAddress, uint32_t EraseEndAddress) {
 
-    HAL_ResumeTick();
+
+	// HAL_ResumeTick();
+    __HAL_RCC_QSPI_FORCE_RESET();  //completely reset peripheral
+    __HAL_RCC_QSPI_RELEASE_RESET();
 
     if (CSP_QUADSPI_Init() != HAL_OK) {
-            HAL_SuspendTick();
+   //         HAL_SuspendTick();
             return LOADER_FAIL;
         }
 
-    if (HAL_QSPI_Abort(&hqspi) != HAL_OK) {
-       HAL_SuspendTick();
-        return LOADER_FAIL;
-    }
+
 
 
     if (CSP_QSPI_EraseSector(EraseStartAddress, EraseEndAddress) != HAL_OK) {
-        HAL_SuspendTick();
+     //   HAL_SuspendTick();
         return LOADER_FAIL;
     }
 
-    HAL_SuspendTick();
+   // HAL_SuspendTick();
     return LOADER_OK;
 }
 
@@ -128,24 +137,24 @@ SectorErase(uint32_t EraseStartAddress, uint32_t EraseEndAddress) {
 int
 MassErase(void) {
 
-    HAL_ResumeTick();
+ //   HAL_ResumeTick();
+  //  Init();
+	// HAL_ResumeTick();
+    __HAL_RCC_QSPI_FORCE_RESET();  //completely reset peripheral
+    __HAL_RCC_QSPI_RELEASE_RESET();
+
     if (CSP_QUADSPI_Init() != HAL_OK) {
-            HAL_SuspendTick();
+        //    HAL_SuspendTick();
             return LOADER_FAIL;
         }
 
-    if (HAL_QSPI_Abort(&hqspi) != HAL_OK) {
-       // HAL_SuspendTick();
-        return LOADER_FAIL;
-    }
-
 
     if (CSP_QSPI_Erase_Chip() != HAL_OK) {
-       // HAL_SuspendTick();
+      //  HAL_SuspendTick();
         return LOADER_FAIL;
     }
 
-
+   // HAL_SuspendTick();
     return LOADER_OK;
 }
 
@@ -237,32 +246,22 @@ CheckSum(uint32_t StartAddress, uint32_t Size, uint32_t InitVal) {
 uint64_t
 Verify(uint32_t MemoryAddr, uint32_t RAMBufferAddr, uint32_t Size, uint32_t missalignement) {
 
-    HAL_ResumeTick();
+	  uint32_t VerifiedData = 0, InitVal = 0;
+	  uint64_t checksum;
+	  Size*=4;
 
-    uint32_t VerifiedData = 0, InitVal = 0;
-    uint64_t checksum;
-    Size *= 4;
+	    if (CSP_QSPI_EnableMemoryMappedMode() != HAL_OK) {
+	       // HAL_SuspendTick();
+	        return LOADER_FAIL;
+	    }
+	  checksum = CheckSum((uint32_t)MemoryAddr + (missalignement & 0xf), Size - ((missalignement >> 16) & 0xF), InitVal);
+	  while (Size>VerifiedData)
+	  {
+	    if ( *(uint8_t*)MemoryAddr++ != *((uint8_t*)RAMBufferAddr + VerifiedData))
+	      return ((checksum<<32) + (MemoryAddr + VerifiedData));
 
-    if (CSP_QUADSPI_Init() != HAL_OK) {
-            HAL_SuspendTick();
-            return LOADER_FAIL;
-        }
-    if (CSP_QSPI_EnableMemoryMappedMode() != HAL_OK) {
-        HAL_SuspendTick();
-        return LOADER_FAIL;
-    }
+	    VerifiedData++;
+	  }
 
-    checksum = CheckSum((uint32_t) MemoryAddr + (missalignement & 0xf),
-                        Size - ((missalignement >> 16) & 0xF), InitVal);
-    while (Size > VerifiedData) {
-        if (*(uint8_t*) MemoryAddr++
-            != *((uint8_t*) RAMBufferAddr + VerifiedData)) {
-            HAL_SuspendTick();
-            return ((checksum << 32) + (MemoryAddr + VerifiedData));
-        }
-        VerifiedData++;
-    }
-
-    HAL_SuspendTick();
-    return (checksum << 32);
+	  return (checksum<<32);
 }
